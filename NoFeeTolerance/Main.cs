@@ -4,19 +4,34 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityModManagerNet;
+using UnityEngine;
 
 namespace NoFeeTolerance
 {
 	public static class Main
 	{
 		public static bool enabled;
-		public static UnityModManager.ModEntry mod;
-		public static Settings settings;
+		public static UnityModManager.ModEntry? mod;
+		public static Settings settings = new Settings();
 
-		private static Harmony harmony;
+		private static Harmony? harmony;
 		private static bool Load(UnityModManager.ModEntry modEntry)
 		{
 			Harmony? harmony = null;
+			mod = modEntry;
+
+			try
+			{
+				Settings? loaded = Settings.Load<Settings>(modEntry);
+				settings = loaded.version == mod.Info.Version ? loaded : new Settings();
+			}
+			catch
+			{
+				settings = new Settings();
+			}
+
+			mod.OnGUI = settings.Draw;
+			mod.OnSaveGUI = settings.Save;
 
 			try
 			{
@@ -39,7 +54,7 @@ namespace NoFeeTolerance
 		{
 			if (settings.isLoggingEnabled)
 			{
-				mod.Logger.Log(message);
+				mod?.Logger.Log(message);
 			}
 		}
 
