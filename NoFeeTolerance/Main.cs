@@ -1,31 +1,68 @@
-﻿using System;
-using System.Reflection;
+using DV.ServicePenalty;
 using HarmonyLib;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using UnityModManagerNet;
 
-namespace MOD_NAME;
-
-public static class Main
+namespace NoFeeTolerance
 {
-	// Unity Mod Manage Wiki: https://wiki.nexusmods.com/index.php/Category:Unity_Mod_Manager
-	private static bool Load(UnityModManager.ModEntry modEntry)
+	public static class Main
 	{
-		Harmony? harmony = null;
+		public static bool enabled;
+		public static UnityModManager.ModEntry mod;
+		public static Settings settings;
 
-		try
+		private static Harmony harmony;
+		private static bool Load(UnityModManager.ModEntry modEntry)
 		{
-			harmony = new Harmony(modEntry.Info.Id);
-			harmony.PatchAll(Assembly.GetExecutingAssembly());
+			Harmony? harmony = null;
 
-			// Other plugin startup logic
+			try
+			{
+				harmony = new Harmony(modEntry.Info.Id);
+				harmony.PatchAll(Assembly.GetExecutingAssembly());
+
+				// Other plugin startup logic
+			}
+			catch (Exception ex)
+			{
+				modEntry.Logger.LogException($"Failed to load {modEntry.Info.DisplayName}:", ex);
+				harmony?.UnpatchAll(modEntry.Info.Id);
+				return false;
+			}
+
+			return true;
 		}
-		catch (Exception ex)
+
+		static void DebugLog(string message)
 		{
-			modEntry.Logger.LogException($"Failed to load {modEntry.Info.DisplayName}:", ex);
-			harmony?.UnpatchAll(modEntry.Info.Id);
-			return false;
+			if (settings.isLoggingEnabled)
+			{
+				mod.Logger.Log(message);
+			}
 		}
 
-		return true;
+		private static float GetTotalDebtExitingLocos(DisplayableDebt debt)
+		{
+			if (debt is ExistingLocoDebt)
+			{
+				DebugLog($"Loco {debt.ID} still exists, ignoring its fees.");
+				return 0;
+			}
+			return debt.GetTotalPrice();
+		}
+
+		[HarmonyPatch(typeof(CareerManagerDebtController), "IsPlayerAllowedToTakeJob")]
+
+		static class IsPlayerAllowedToTakeJobPatch
+		{
+			static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+			{
+				return instructions.MethodReplacer(
+					typeof(DisplayableDebt).GetMethod("GetTotalPrice"),
+					typeof(Main).GetMethod("GetTotalDebtForJobPurposes"));
+			}
+		}
 	}
 }
