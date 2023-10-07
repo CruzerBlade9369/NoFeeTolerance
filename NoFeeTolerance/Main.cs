@@ -57,6 +57,19 @@ namespace NoFeeTolerance
 			}
 		}
 
+		public static float GetTotalDebtForJobPurposes(DisplayableDebt debt)
+		{
+			if (!enabled)
+			{
+				return debt.GetTotalPrice();
+
+				return GetTotalDebtExitingLocos(debt);
+			}
+
+			return debt.GetTotalPrice();
+
+		}
+
 		private static float GetTotalDebtExitingLocos(DisplayableDebt debt)
 		{
 			if (debt is ExistingLocoDebt)
