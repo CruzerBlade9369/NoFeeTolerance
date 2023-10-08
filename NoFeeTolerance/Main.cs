@@ -1,94 +1,77 @@
 using DV.ServicePenalty;
+using DV.ServicePenalty.UI;
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using UnityModManagerNet;
 
 namespace NoFeeTolerance
 {
+	[EnableReloading]
 	public static class Main
 	{
 		public static bool enabled;
 		public static UnityModManager.ModEntry? mod;
 		public static Settings settings = new Settings();
 
-		private static Harmony? harmony;
-		private static bool Load(UnityModManager.ModEntry modEntry)
+		public static bool Load(UnityModManager.ModEntry modEntry)
 		{
-			Harmony? harmony = null;
+			var harmony = new Harmony(modEntry.Info.Id);
+			harmony.PatchAll(Assembly.GetExecutingAssembly());
+			DebugLog("Attempting Patch.");
+
 			mod = modEntry;
-
-			try
-			{
-				Settings? loaded = Settings.Load<Settings>(modEntry);
-				settings = loaded.version == mod.Info.Version ? loaded : new Settings();
-			}
-			catch
-			{
-				settings = new Settings();
-			}
-
-			mod.OnGUI = settings.Draw;
-			mod.OnSaveGUI = settings.Save;
-
-			try
-			{
-				harmony = new Harmony(modEntry.Info.Id);
-				harmony.PatchAll(Assembly.GetExecutingAssembly());
-
-				// Other plugin startup logic
-			}
-			catch (Exception ex)
-			{
-				modEntry.Logger.LogException($"Failed to load {modEntry.Info.DisplayName}:", ex);
-				harmony?.UnpatchAll(modEntry.Info.Id);
-				return false;
-			}
+			modEntry.OnToggle = OnToggle;
+#if DEBUG || RELOAD
+			modEntry.OnUnload = OnUnload;
+#endif
+			modEntry.OnGUI = OnGui;
+			modEntry.OnSaveGUI = OnSaveGui;
 
 			return true;
 		}
 
+		static void OnGui(UnityModManager.ModEntry modEntry)
+		{
+			settings.Draw(modEntry);
+		}
+
+		static void OnSaveGui(UnityModManager.ModEntry modEntry)
+		{
+			settings.Save(modEntry);
+		}
+
+		static bool OnToggle(UnityModManager.ModEntry modEntry, bool value)
+		{
+			if (value != enabled)
+			{
+				enabled = value;
+			}
+			return true;
+		}
+
+#if DEBUG || RELOAD
+		static bool OnUnload(UnityModManager.ModEntry modEntry)
+		{
+			var harmony = new Harmony(modEntry.Info.Id);
+			harmony.UnpatchAll(modEntry.Info.Id);
+			DebugLog("Removing patch.");
+			return true;
+		}
+#endif
+
 		static void DebugLog(string message)
 		{
 			if (settings.isLoggingEnabled)
-			{
 				mod?.Logger.Log(message);
-			}
 		}
 
-		public static float GetTotalDebtForJobPurposes(DisplayableDebt debt)
+		[HarmonyPatch(typeof(CareerManagerDebtController), nameof(CareerManagerDebtController.FeeTolerance), MethodType.Getter)]
+		static class FeeTolerancePatcher
 		{
-			if (!enabled)
+			static bool Prefix(ref float __result)
 			{
-				return debt.GetTotalPrice();
-
-				return GetTotalDebtExitingLocos(debt);
-			}
-
-			return debt.GetTotalPrice();
-
-		}
-
-		private static float GetTotalDebtExitingLocos(DisplayableDebt debt)
-		{
-			if (debt is ExistingLocoDebt)
-			{
-				DebugLog($"Loco {debt.ID} still exists, ignoring its fees.");
-				return 0;
-			}
-			return debt.GetTotalPrice();
-		}
-
-		[HarmonyPatch(typeof(CareerManagerDebtController), "IsPlayerAllowedToTakeJob")]
-
-		static class IsPlayerAllowedToTakeJobPatch
-		{
-			static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-			{
-				return instructions.MethodReplacer(
-					typeof(DisplayableDebt).GetMethod("GetTotalPrice"),
-					typeof(Main).GetMethod("GetTotalDebtForJobPurposes"));
+				__result = float.PositiveInfinity;
+				return false;
 			}
 		}
 	}

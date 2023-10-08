@@ -13,6 +13,9 @@
 		<Reference Include="DV.ThingTypes">
 		  <HintPath>..\..\..\..\Steam\steamapps\common\Derail Valley\DerailValley_Data\Managed\DV.ThingTypes.dll</HintPath>
 		</Reference>
+		<Reference Include="DV.Utils">
+		  <HintPath>..\..\..\..\Steam\steamapps\common\Derail Valley\DerailValley_Data\Managed\DV.Utils.dll</HintPath>
+		</Reference>
 	</ItemGroup>
 
 	<!-- Unity -->
